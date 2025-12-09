@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Dammam Accessibility Map – Dark Theme Demo</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<style>
+  /* Futuristic popup container */
+  .futuristic-popup {
+    background: rgba(20, 20, 20, 0.85);
+    padding: 12px 16px;
+    border-radius: 10px;
+    color: #eee;
+    font-family: "Segoe UI", sans-serif;
+    box-shadow: 0 0 15px rgba(0, 247, 255, 0.4);
+    backdrop-filter: blur(6px);
+  }
+
+  .popup-title {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #00eaff;
+    text-shadow: 0 0 8px #00eaff;
+  }
+
+  .popup-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  .popup-table td {
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.1);
+  }
+
+  .popup-label {
+    color: #aaa;
+  }
+
+  .popup-value {
+    text-align: right;
+    font-weight: 500;
+  }
+
+  .good {
+    color: #2ecc71;
+    text-shadow: 0 0 6px #2ecc71;
+  }
+
+  .bad {
+    color: #e74c3c;
+    text-shadow: 0 0 6px #e74c3c;
+  }
+</style>
+
+<style>
+  html, body { height: 100%; margin: 0; background: #111; }
+  #map { height: 100%; width: 100%; }
+
+  /* Polygon styling */
+  .legend {
+    background: rgba(0,0,0,0.7);
+    padding: 10px 12px;
+    font-size: 13px;
+    color: #eee;
+    border-radius: 6px;
+    line-height: 20px;
+  }
+  .legend i {
+    width: 16px;
+    height: 16px;
+    float: left;
+    margin-right: 8px;
+    opacity: 0.9;
+    
+  }
+  .glow-zone {
+  filter: drop-shadow(0 0 12px rgba(0,255,255,0.7))
+          drop-shadow(0 0 18px rgba(0,255,255,0.3));
+}
+
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+
+// Initialize map (dark theme)
+const map = L.map('map').setView([26.3927, 50.1875], 12);
+
+L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png",
+  {
+    attribution: "&copy; OpenStreetMap & Carto",
+    maxZoom: 19
+  }
+).addTo(map);
+
+
+// ----------------------------
+// 1) LOAD REAL ROADS FROM FILE
+// ----------------------------
+
+fetch("./roads_dammam.geojson")
+  .then(res => res.json())
+  .then(data => {
+
+    console.log("Loaded roads:", data.features.length);
+
+    // Add synthetic slope to each road (just for demo)
+    data.features = data.features.map(f => {
+      f.properties.slope = generateSlope(f);
+      return f;
+    });
+
+    L.geoJSON(data, {
+      style: roadStyle,
+      onEachFeature: onEachRoad
+    }).addTo(map);
+
+  });
+
+
+// ----------------------------
+// 2) FUTURISTIC SLOPE GENERATOR (DEMO)
+// ----------------------------
+// Using road length and classification to simulate slope temporarily
+
+function generateSlope(feature) {
+  const coords = feature.geometry.coordinates;
+  let length = 0;
+
+  for (let i = 1; i < coords.length; i++) {
+    const dx = coords[i][0] - coords[i - 1][0];
+    const dy = coords[i][1] - coords[i - 1][1];
+    length += Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Very rough synthetic slope model:
+  if (length > 0.015) return 3 + Math.random() * 3;   // major highways
+  if (length > 0.007) return 5 + Math.random() * 5;   // secondary
+  return 8 + Math.random() * 6;                       // steeper small roads
+}
+
+
+// ----------------------------
+// 3) VISUAL STYLE FOR ROADS
+// ----------------------------
+
+function slopeToColor(slope) {
+  return slope > 12 ? "#ff4d4d" :
+         slope > 8  ? "#ff884d" :
+         slope > 5  ? "#ffcc4d" :
+                       "#3df27b";
+}
+
+function roadStyle(feature) {
+  const slope = feature.properties.slope;
+  return {
+    color: slopeToColor(slope),
+    weight: 4,
+    opacity: 0.95,
+    lineJoin: "round",
+    lineCap: "round"
+  };
+}
+
+// Custom icon for citizen reports
+const reportIcon = L.icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/595/595067.png", // warning/flag icon
+  iconSize: [28, 28],
+  iconAnchor: [14, 28],
+  popupAnchor: [0, -28]
+});
+// ----------------------------
+//  RANDOM CITIZEN REPORTS (20 POINTS)
+// ----------------------------
+
+// Map bounds for random placement (set for Dammam)
+const minLat = 26.32;
+const maxLat = 26.44;
+const minLng = 50.10;
+const maxLng = 50.20;
+
+// Issue categories
+const issues = [
+  "Broken Ramp",
+  "Sidewalk Obstruction",
+  "No Audio Signal",
+  "Damaged Tactile Path",
+  "High Curb",
+  "Blocked Wheelchair Path",
+  "Steep Slope",
+  "Inaccessible Bus Stop"
+];
+
+// Severity color helper
+function sevColor(level) {
+  return level === "High" ? "#ff4d4d" :
+         level === "Medium" ? "#ffbd4d" :
+         "#3df27b";
+}
+
+// Generate 20 random reports
+const reportFeatures = [];
+
+for (let i = 1; i <= 20; i++) {
+  const lat = minLat + Math.random() * (maxLat - minLat);
+  const lng = minLng + Math.random() * (maxLng - minLng);
+
+  const issueType = issues[Math.floor(Math.random() * issues.length)];
+
+  const severity = ["Low", "Medium", "High"][Math.floor(Math.random() * 3)];
+
+  reportFeatures.push({
+    "type": "Feature",
+    "properties": {
+      "id": "RPT-" + String(i).padStart(3, "0"),
+      "issue": issueType,
+      "severity": severity,
+      "timestamp": new Date().toISOString().slice(0, 19).replace("T", " "),
+      "comment": "Citizen reported: " + issueType.toLowerCase()
+    },
+    "geometry": {
+      "type": "Point",
+      "coordinates": [lng, lat]
+    }
+  });
+}
+
+
+// ----------------------------
+// ADD REPORT POINTS TO MAP
+// ----------------------------
+
+L.geoJSON({
+  "type": "FeatureCollection",
+  "features": reportFeatures
+}, {
+  pointToLayer: function(feature, latlng) {
+    return L.marker(latlng, { icon: reportIcon });
+  },
+
+  onEachFeature: function(feature, layer) {
+    const p = feature.properties;
+
+    const popupHTML = `
+      <div style="
+        background: rgba(255, 245, 230, 0.95);
+        padding: 12px;
+        border-radius: 10px;
+        font-family: 'Segoe UI';
+        color: #333;
+        box-shadow: 0 0 12px rgba(255,165,0,0.5);
+      ">
+        <h3 style="margin:0; font-size:16px; color:#d35400;">
+          🚩 Citizen Report
+        </h3>
+        <hr style="border:0; border-top:1px solid #ccc; margin:8px 0;">
+        
+        <b>ID:</b> ${p.id} <br>
+        <b>Issue:</b> ${p.issue} <br>
+        <b>Severity:</b> 
+          <span style="color:${sevColor(p.severity)}; font-weight:bold;">
+            ${p.severity}
+          </span><br>
+        <b>Time:</b> ${p.timestamp} <br>
+        <b>Comment:</b> ${p.comment}
+      </div>
+    `;
+
+    layer.bindPopup(popupHTML);
+  }
+
+}).addTo(map);
+
+// ----------------------------
+// 4) FUTURISTIC POPUP TABLE
+// ----------------------------
+
+function onEachRoad(feature, layer) {
+  const p = feature.properties;
+
+  const popupHTML = `
+    <div class="futuristic-popup">
+      <div class="popup-title">${p["name:en"] || p.name || "Unnamed Road"}</div>
+
+      <table class="popup-table">
+        <tr>
+          <td class="popup-label">Road Type</td>
+          <td class="popup-value">${p.highway || "-"}</td>
+        </tr>
+
+        <tr>
+          <td class="popup-label">Speed Limit</td>
+          <td class="popup-value">${p.maxspeed || "N/A"}</td>
+        </tr>
+
+        <tr>
+          <td class="popup-label">Slope (simulated)</td>
+          <td class="popup-value ${p.slope > 8 ? "bad" : "good"}">
+            ${p.slope.toFixed(1)}°
+          </td>
+        </tr>
+      </table>
+    </div>
+  `;
+
+  layer.bindPopup(popupHTML);
+}
+// ----------------------------
+// ACCESSIBILITY COMPLIANCE ZONES – LARGE GLOWING CIRCLES (SHIFTED EAST)
+// ----------------------------
+
+const complianceZones = {
+  "type": "FeatureCollection",
+  "features": [
+
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Zone 1 – South Dammam",
+        "overall": 78,
+        "toilets": 80,
+        "ramps": 70,
+        "doors": 75
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [50.209943844666, 26.31567490900134]
+      }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Zone 2 – West Dammam",
+        "overall": 65,
+        "toilets": 60,
+        "ramps": 55,
+        "doors": 70
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [50.16478933739507, 26.324356222587546]
+      }
+    },
+
+    {
+      "type": "Feature",
+      "properties": {
+        "name": "Zone 3 – Central Dammam",
+        "overall": 90,
+        "toilets": 95,
+        "ramps": 88,
+        "doors": 90
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [50.20516638873613, 26.335622206607365]
+      }
+    }
+
+  ]
+};
+
+
+// Color palette distinct from roads
+function zoneGlowColor(overall) {
+  return overall >= 80 ? "#00ffe0" :     // neon cyan
+         overall >= 60 ? "#ffdd33" :     // gold
+                          "#ff42e6";     // neon pink
+}
+
+
+// Add large glowing circle zones
+L.geoJSON(complianceZones, {
+  pointToLayer: function(feature, latlng) {
+    const p = feature.properties;
+
+    return L.circle(latlng, {
+      radius: 1100,  // ~1.8 km radius (larger & more visible)
+      color: zoneGlowColor(p.overall),
+      fillColor: zoneGlowColor(p.overall),
+      fillOpacity: 0.28,
+      opacity: 1,
+      weight: 4,
+      className: "glow-zone"
+    });
+  },
+
+  onEachFeature: function(feature, layer) {
+    const p = feature.properties;
+
+    const popupHTML = `
+      <div class="futuristic-popup">
+        <div class="popup-title">${p.name}</div>
+
+        <table class="popup-table">
+          <tr><td class="popup-label">Overall</td>
+              <td class="popup-value ${p.overall >= 80 ? "good" : "bad"}">${p.overall}%</td></tr>
+
+          <tr><td class="popup-label">Toilet Access</td>
+              <td class="popup-value ${p.toilets >= 80 ? "good" : "bad"}">${p.toilets}%</td></tr>
+
+          <tr><td class="popup-label">Ramps</td>
+              <td class="popup-value ${p.ramps >= 80 ? "good" : "bad"}">${p.ramps}%</td></tr>
+
+          <tr><td class="popup-label">Automatic Doors</td>
+              <td class="popup-value ${p.doors >= 80 ? "good" : "bad"}">${p.doors}%</td></tr>
+        </table>
+      </div>
+    `;
+
+    layer.bindPopup(popupHTML);
+  }
+
+}).addTo(map);
+
+</script>
+
+</body>
+</html>
