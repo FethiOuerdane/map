@@ -327,7 +327,7 @@ const complianceZones = {
       "properties": {
         "name": "Zone 1 – South Dammam",
         "overall": 78,
-        "Parking Spots": 80,
+        "parking": 80,
         "ramps": 70,
         "doors": 75
       },
@@ -342,7 +342,7 @@ const complianceZones = {
       "properties": {
         "name": "Zone 2 – West Dammam",
         "overall": 65,
-        "Parking Spots": 60,
+        "parking": 60,
         "ramps": 55,
         "doors": 70
       },
@@ -357,7 +357,7 @@ const complianceZones = {
       "properties": {
         "name": "Zone 3 – Central Dammam",
         "overall": 90,
-        "Parking Spots": 95,
+        "parking": 95,
         "ramps": 88,
         "doors": 90
       },
@@ -407,7 +407,7 @@ L.geoJSON(complianceZones, {
               <td class="popup-value ${p.overall >= 80 ? "good" : "bad"}">${p.overall}%</td></tr>
 
           <tr><td class="popup-label">Parking Spots</td>
-              <td class="popup-value ${p.toilets >= 80 ? "good" : "bad"}">${p.toilets}%</td></tr>
+              <td class="popup-value ${p.parking >= 80 ? "good" : "bad"}">${p.parking}%</td></tr>
 
           <tr><td class="popup-label">Ramps</td>
               <td class="popup-value ${p.ramps >= 80 ? "good" : "bad"}">${p.ramps}%</td></tr>
